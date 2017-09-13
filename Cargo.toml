@@ -1,0 +1,6 @@
+[package]
+name = "huffman_code"
+version = "0.1.0"
+authors = ["Michael Murphy <murphym18@gmail.com>"]
+
+[dependencies]
