@@ -106,6 +106,35 @@ impl BitWriter {
     }
 }
 
+struct BitReader {
+    input: Box<Read>,
+    buf: u8,
+    next_bit: u8
+}
+
+impl BitReader {
+    fn new(input: Box<Read>) -> BitReader {
+        let buf = 0;
+        let next_bit = 8;
+        BitReader {
+            input,
+            buf,
+            next_bit
+        }
+    }
+
+    fn next(&mut self) -> u8 {
+        if self.next_bit > 7 {
+            self.buf = read_one_byte(&mut self.input);
+            self.next_bit = 0;
+        }
+
+        let result: u8 = (self.buf >> self.next_bit) & 1;
+        self.next_bit = self.next_bit + 1;
+        result
+    }
+}
+
 fn byte_string(data: u8, num_bits: u8) -> String {
     let mut result = String::new();
     let mut i = 0;
@@ -192,6 +221,36 @@ fn decompress() {
     // find out how big the decompressed file will be
     let size = read_u64_be(&mut compressed_file);
     println!("size of uncompresed file will be {}", size);
+    let mut br = BitReader::new(Box::new(compressed_file));
+
+    let mut output = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("tmp.txt")
+        .expect("could open output file");
+
+    let mut num_written = 0;
+    let mut current_node = &tree;
+    while num_written < size {
+        match *current_node {
+            Leaf {count, value} => {
+                output.write(&[value]);
+                num_written = num_written + 1;
+                current_node = &tree;
+            },
+            Node {count, ref left, ref right} => {
+                let bit = br.next();
+                if bit == 0 {
+                    current_node = left;
+                } else {
+                    current_node = right;
+                }
+            }
+        }
+    }
+
 }
 
 fn read_u64_be(input: &mut Read) -> u64 {
