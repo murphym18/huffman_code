@@ -170,6 +170,74 @@ fn print_tree(t: &Tree, spaces: u32) {
 use Tree::{Node, Leaf};
 
 fn main() {
+    // compress();
+    decompress();
+}
+
+fn decompress() {
+    let mut compressed_file = File::open("test.txt.hc").expect("File not found");
+    // read the first byte
+    let table_size = read_one_byte(&mut compressed_file);
+    // read the table
+    let mut table_vec: Vec<Tree> = Vec::new();
+    let mut i = 0;
+    while i < table_size {
+        table_vec.push(read_one_table_record(&mut compressed_file));
+        i = i + 1;
+    }
+    // make the tree
+    let mut tree = make_tree(table_vec);
+    print_tree(&tree, 0);
+
+    // find out how big the decompressed file will be
+    let size = read_u64_be(&mut compressed_file);
+    println!("size of uncompresed file will be {}", size);
+}
+
+fn read_u64_be(input: &mut Read) -> u64 {
+    let mut buf: [u8; 8] = [0; 8];
+    let n = input.read(&mut buf).expect("couldn't read u64");
+    if n < 8 {
+        println!("n = {}", n);
+        panic!("couldn't read u64");
+    }
+    let tmp: u64 = unsafe {
+        transmute(buf)
+    };
+    tmp.to_be()
+}
+
+fn read_one_table_record(input: &mut Read) -> Tree {
+    let value = read_one_byte(input);
+    let mut buf: [u8; 8] = [0; 8];
+    let error_message = "couldn't read table record";
+    let n = input.read(&mut buf).expect(error_message);
+    if n < 8 {
+        println!("n = {}", n);
+        panic!(error_message);
+    }
+
+    let mut count: u64 = unsafe {
+        transmute(buf)
+    };
+    count = count.to_be();
+
+    Leaf {
+        count,
+        value
+    }
+}
+
+fn read_one_byte(input: &mut Read) -> u8 {
+    let mut buf: [u8; 1] = [0; 1];
+    let n = input.read(&mut buf).expect("Error reading from input");
+    if n < 1 {
+        panic!("could not read a byte");
+    }
+    buf[0]
+}
+
+fn compress() {
     let mut f = File::open("test.txt").expect("File not found");
     let list = count_byte_occurrences(&mut f);
     let v = make_tree_leaves(list);
@@ -182,14 +250,22 @@ fn main() {
     f.seek(SeekFrom::Start(0));
 
     // open output file
-    let mut output = OpenOptions::new().read(true).write(true).create(true).truncate(true).open("test.txt.hc").expect("could open output file");
+    let mut output = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("test.txt.hc")
+        .expect("could open output file");
+
     // write to output file the length of the list of byte occurences
     let leaves = make_tree_leaves(list);
     let list_len: u8 = leaves.len() as u8;
     let list_len_buf: [u8; 1] = [list_len; 1];
     output.write_all(&list_len_buf);
     // write to output file the list of byte occurences
-    for l in leaves {
+    let leaves_tmp = make_tree_leaves(list);
+    for l in leaves_tmp {
         match l {
             Leaf {count, value} => {
                 let val: u8 = value;
@@ -201,9 +277,25 @@ fn main() {
                 buf[1..].clone_from_slice(&count_bytes);
                 output.write_all(&buf);
             }
-            _ => {}
+            _ => {
+                panic!("this should never happen")
+            }
         }
     }
+
+    // write the size of the original file (number of bytes)
+    let mut size: u64 = 0;
+    for l in leaves {
+        match l {
+            Leaf {count, value} => size = size + count,
+            _ => panic!("this should never happen")
+        }
+    }
+    let mut buf: [u8; 8] = unsafe {
+        transmute(size.to_be())
+    };
+    output.write_all(&buf);
+
     // wrap out file in BitWriter
     let mut bw = BitWriter::wrap(Box::new(output));
     // for each byte in the input file write its bits to the output file
