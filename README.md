@@ -12,13 +12,13 @@ I saw a [video about huffman codes](https://www.youtube.com/watch?v=JsTptu56GM8)
 ```bash
 cat 'hello world this is my text' > test.txt
 ```
-5) edit [main.rs](https://github.com/murphym18/huffman_code/blob/master/src/main.rs#L202) uncomment line 202 and comment line 203
-6) run the program
+
+5) run the program
 ```bash
 cargo run
 ```
-7) The program should have created a new file test.txt.hc that contains the compressed data.
-8) edit [main.rs](https://github.com/murphym18/huffman_code/blob/master/src/main.rs#L202) comment line 202 and uncomment line 203
+6) The program should have created a new file test.txt.hc that contains the compressed data.
+7) edit [main.rs](https://github.com/murphym18/huffman_code/blob/master/src/main.rs#L4) comment line 5 and uncomment line 6
 8) run the program again
 ``` bash
 cargo run
